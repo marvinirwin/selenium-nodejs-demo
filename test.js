@@ -63,7 +63,12 @@ const _ = require('lodash');
          * @return {*[]}
          */
         function (e) {
+            /**
+             * @type {KeyboardEvent}
+             */
+            let ek = e;
             switch (e.type) {
+
                 case "click":
                     if (e.target.className === 'name-selector-prompt') {
                         return [false, null];
@@ -90,22 +95,15 @@ const _ = require('lodash');
                         null
                     ];
                 case "keypress":
-                    if (ek.key === 'e') {
-                            $.toast(`alt: ${e.altKey} ctrl: ${e.ctrlKey}`);
-                    }
 
-                    if (ek.key === 'e' && ek.altKey && ek.ctrlKey) {
+
+                case "keydown":
+                    $.toast(`key: ${e.key} alt: ${e.altKey} ctrl: ${e.ctrlKey}`);
+                    if (ek.key === 'e' && ek.ctrlKey) {
                         return [true, {
                             type: "EXECUTE_STORY",
                         }];
                     }
-                    return [false, null];
-
-                case "keydown":
-                    /**
-                     * @type {KeyboardEvent}
-                     */
-                    let ek = e;
                     if (ek.target.className === 'name-selector-prompt' && ek.key === "Enter") {
                         let newName = e.target.value;
                         const p = e.target.placeholder;

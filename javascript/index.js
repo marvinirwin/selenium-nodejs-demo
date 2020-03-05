@@ -1,6 +1,11 @@
 const path = require('path');
 const fs = require('fs');
 const SAVE_FILENAME = './story.json';
+const _ = require('lodash');
+const nearley = require('nearley');
+const grammar = require('../grammar/grammar');
+const webdriver = require('selenium-webdriver');
+const sleep = n => new Promise(resolve => setTimeout(resolve, n))
 
 /**
  * Gets the driver to place a script tag containing the css from the file at @param path
@@ -245,15 +250,17 @@ async function executeSentences(driver, sentences) {
         const parsedSentences = sentences.map(s => parseSentence(s));
         const scope = {};
         let scopeElement;
-        for (let i = 0; i < parsedSentence.length; i++) {
-            const p = parsedSentence[i];
+        for (let i = 0; i < parsedSentences.length; i++) {
+            const p = parsedSentences[i];
             switch (p.type) {
                 case "definition":
+                    debugToast(driver, `${varname} is ${selector}`);
                     const {varName, selector} = p;
                     scope[varName] = selector;
                     break;
                 case "action":
                     const {verb, article, noun} = p;
+                    debugToast(driver, `${verb} ${noun}`);
                     switch (verb) {
                         case "Click":
                             // For now you can only reference nouns by their variable names, not raw selectors
