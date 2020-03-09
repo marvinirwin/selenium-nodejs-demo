@@ -5,7 +5,8 @@ const _ = require('lodash');
 const nearley = require('nearley');
 const grammar = require('../grammar/grammar');
 const webdriver = require('selenium-webdriver');
-const sleep = n => new Promise(resolve => setTimeout(resolve, n))
+const sleep = n => new Promise(resolve => setTimeout(resolve, n));
+const {Subject, BehaviorSubject} = require('rxjs');
 
 /**
  * Gets the driver to place a script tag containing the css from the file at @param path
@@ -32,7 +33,12 @@ async function loadJavascript(driver) {
     await loadBundle(driver, path.join(__dirname, 'bundle.js'), 'unique');
     await loadBundle(driver, path.join(__dirname, 'jquery.js'));
     await loadBundle(driver, path.join(__dirname, 'jquery.toast.min.js'));
+    await loadBundle(driver, path.join(__dirname, 'lodash.js'));
     await loadCss(driver, path.join(__dirname, 'jquery.toast.min.css'));
+    await loadBundle(driver, path.join(__dirname, 'jquery-ui.min.js'));
+    await loadCss(driver, path.join(__dirname, 'jquery-ui.min.css'));
+    await loadCss(driver, path.join(__dirname, 'jquery-ui.structure.min.css'));
+    await loadCss(driver, path.join(__dirname, 'jquery-ui.theme.min.css'));
     await driver.executeScript(`window.prompt = ${prompt.toString()}`);
     // await loadBundle(driver, path.join(__dirname, 'jquery-modal.js')); TODO do we need this?
 }
@@ -79,7 +85,7 @@ async function debugToast(driver, msg) {
         `
             $.toast("${msg}")
         `
-        , fs.readFileSync(path).toString());
+    );
 }
 
 /**
@@ -106,97 +112,39 @@ function prompt(sel) {
 }
 
 /**
- * Loads the story object, from disk if it hasn't been already
- * @return {*}
- */
-function getStoryObject() {
-    return fs.existsSync(SAVE_FILENAME) ?
-        JSON.parse(fs.readFileSync(SAVE_FILENAME).toString()) :
-        {names: {}, actions: []};
-}
-
-/**
- * Persists the current story object to disk
- * @param o
- */
-function saveStoryObject(o) {
-    fs.writeFileSync(SAVE_FILENAME, JSON.stringify(o, null, '\t'));
-}
-
-/**
- * Adds a definition to the story object
- * @param sel
- * @param name
- */
-function addDefinitionToStoryObject(sel, name) {
-    const storyObject = getStoryObject();
-    storyObject.names[sel] = name;
-    saveStoryObject(storyObject);
-}
-
-/**
- * Adds an action upon a subject to the story object
- * @param action
- * @param subject
- */
-function addActionToStoryObject(action, subject) {
-    const storyObject = getStoryObject();
-    storyObject.actions.push({action, subject});
-    saveStoryObject(storyObject);
-}
-
-/**
- * Sets window.storyObject
- * @param d
- * @param storyObject
- * @return {*}
- */
-function updateStoryObjectInBrowser(d, storyObject) {
-    const s = JSON.stringify(storyObject);
-    return d.executeScript(`
-    window.storyObject = JSON.parse(arguments[0]);
-    `, s);
-}
-
-/**
- *
- * @param d {WebDriver}
- * @param storyObject
- */
-function setStoryDisplayText(d, storyObject) {
-    const defintions = Object.entries(storyObject.names)
-        .map(([selector, name]) => `${name} is ${selector}.`);
-    const actions = storyObject.actions.map(({action, subject}) => {
-        return `${action} ${subject}.`
-    });
-
-    const f = () => {
-        const storyEl = document.getElementById('user-story-element');
-        // First get rid of all children
-        [...storyEl.children].forEach(e => e.remove());
-        storyEl.innerText = arguments[0];
-    }
-    const s = f.toString();
-    let script = `(${s})()`;
-    return d.executeScript(script, defintions.concat(actions).join('\n'));
-}
-
-/**
  * Create an instance of the story display
  *
  * @param d {WebDriver}
  */
-function createStoryDisplay(d) {
+function createSentenceListAndInputBox(d) {
     function f() {
-        const storyEl = document.createElement('div');
+        const containerEl = document.createElement('div');
+        const textEl = document.createElement('textarea');
+        const storyEl = document.createElement('ol');
+        textEl.onchange = _.debounce(e => {
+            // TODO check that this innerText is the right thing to look for
+            // Also, this should probably be debounced
+            // I could use lodash
+            // Yeah I should load lodash into the browser
+            window.seleniumContext.story$.next(e.target.innerText);
+        }, 1000);
+
+        window.seleniumContext.story$.subscribe(v => {
+
+        });
+        containerEl.appendChild(textEl);
+        containerEl.appendChild(storyEl);
         storyEl.id = 'user-story-element';
         storyEl.style.top = '0';
         storyEl.style.position = 'fixed';
-        storyEl.style.backgroundColor = 'black';
+        // storyEl.style.backgroundColor = 'black';
         storyEl.style.minHeight = '100px';
         storyEl.style.minWidth = '100px';
-        document.body.appendChild(storyEl)
+        document.body.appendChild(storyEl);
+
+
     }
+
 
     return d.executeScript(`(${f.toString()})()`);
 }
@@ -228,18 +176,6 @@ function parseSentence(sentence) {
 }
 
 /**
- * Converts the storyObject into sentences, and then calls executeSentences
- * @param driver
- * @return {Promise<void>}
- */
-async function executeStoryObject(driver) {
-    const o = getStoryObject();
-    const sentences = Object.entries(o.names).map(([sel, name]) => `${name} is ${sel}.`);
-    sentences.push(...o.actions.filter(({action, subject}) => action && subject).map(({action, subject}) => `${_.capitalize(action)} the ${subject}.`));
-    await executeSentences(driver, sentences);
-}
-
-/**
  * Converts e
  * @param driver
  * @param sentences
@@ -254,8 +190,8 @@ async function executeSentences(driver, sentences) {
             const p = parsedSentences[i];
             switch (p.type) {
                 case "definition":
-                    debugToast(driver, `${varname} is ${selector}`);
                     const {varName, selector} = p;
+                    debugToast(driver, `${varName} is ${selector}`);
                     scope[varName] = selector;
                     break;
                 case "action":
@@ -302,6 +238,318 @@ async function executeSentences(driver, sentences) {
     }
 }
 
+/**
+ *
+ * @param driver {Driver}
+ * @param id
+ */
+function removeElement(driver, id) {
+    driver.executeScript(`
+    const [id] = arguments;
+    document.getElementById(id).remove(); 
+    `, id);
+}
+
+/**
+ * Performs all necessary setup for a DSL IDE/interpreter
+ * @param page
+ * @param browser
+ * @return {Promise<WebDriver>}
+ */
+async function setup(page, browser = 'chrome') {
+    const d = new webdriver.Builder()
+        .forBrowser(browser)
+        .build();
+    await d.get(page);
+
+    return d;
+}
+
+class SeleniumContext {
+    constructor() {
+        this.story$ = new BehaviorSubject();
+        this.keydown$ = new Subject();
+        this.click$ = new Subject();
+        this.addAction$ = new Subject();
+        this.addDefinition$ = new Subject();
+        this.executeStory$ = new Subject();
+    }
+}
+
+class DriverObs {
+    constructor(d, story) {
+        this.seleniumContext = new SeleniumContext();
+        this.driver$ = new BehaviorSubject(d);
+        (async () => {
+            await setupMessagePasser(d);
+            await loadJavascript(d);
+            await createSentenceListAndInputBox(d);
+        })();
+
+
+        this.seleniumContext.subscribe(s => {
+            fs.writeFile('./story.txt', s);
+            setStoryDisplayText(d, s);
+            debugToast(this.driver$.getValue(), 'Updated story');
+        });
+        this.seleniumContext.addAction$.subscribe(v => {
+            this.seleniumContext.story.next(insertActionIntoStory(v, this.seleniumContext.story$.getValue()))
+        });
+        this.seleniumContext.addDefinition$.subscribe(v => {
+            this.seleniumContext.story.next(insertDefinitionIntoStory(v, this.seleniumContext.story$.getValue()))
+        })
+        this.seleniumContext.executeStory$.subscribe(v => {
+
+        })
+    }
+}
+
+const allEventTypes = [
+    'ACTION',
+    'EXECUTE_STORY',
+    'NAME_SELECTOR',
+];
+async function setupRecorder(driver) {
+    const setupRecorder = () => {
+        function handleEvents(e) {
+            /**
+             * @type {KeyboardEvent}
+             */
+            let ek = e;
+            switch (e.type) {
+                case "click":
+                    if (e.target.className === 'name-selector-prompt') {
+                        return [false, null];
+                    }
+                    // For now only record things with the shift key
+                    if (!e.shiftKey) {
+                        return [false, null];
+                    }
+                    let s = unique(e.target);
+                    let storyObject = window.storyObject;
+                    let name1 = window.storyObject.names[s];
+                    if (!name1) {
+                        window.prompt(s);
+                    } else if (name1) {
+                        return [
+                            true, {
+                                type: 'ACTION',
+                                action: e.type,
+                                subject: name1
+                            }];
+                    }
+                    return [
+                        false,
+                        null
+                    ];
+                case "keydown":
+                    $.toast(`key: ${e.key} alt: ${e.altKey} ctrl: ${e.ctrlKey}`);
+                    if (ek.key === 'e' && ek.ctrlKey) {
+                        return [true, {
+                            type: "EXECUTE_STORY",
+                        }];
+                    }
+                    if (ek.target.className === 'name-selector-prompt' && ek.key === "Enter") {
+                        let newName = e.target.value;
+                        const p = e.target.placeholder;
+                        let newVar = {
+                            type: "NAME_SELECTOR",
+                            newName: newName,
+                            selectorForElementGettingNamed: p
+                        };
+                        e.target.remove();
+                        return [
+                            true,
+                            newVar
+                        ]
+                    }
+
+                    return [false, null];
+                default:
+                    return [false, null]
+            }
+        }
+
+        function handleEv(e) {
+            const ret = handleEvents(e);
+            // If handleEvents didn't return anything, return
+            if (!ret) return;
+
+            const [success, result] = ret;
+            if (!success) return;
+            switch(result.type) {
+                case "NAME_SELECTOR":
+                    window.seleniumContext.addDefinition$.next(result);
+                    break;
+                case "ACTION":
+                    window.seleniumContext.addAction$.next(result);
+                    break;
+                case "EXECUTE_STORY":
+                    // Since these things only propagate if they're different then
+                    // We have to inc, this is a cheap hack
+                    // Should probably use reduce here
+                    window.seleniumContext.executeStory$.next(
+                        window.seleniumContext.executeStory$.getValue() + 1
+                    )
+                    break;
+            }
+        }
+
+    };
+    let s = `
+    const f = () => ${handleEvents.toString()}
+    
+    `;
+    console.log(s);
+
+    driver.executeScript(s);
+}
+async function setupMessagePasser(driver, seleniumContext) {
+    // Create window.seleniumContext with all the keys of seleniumContext
+    const setupObservables = () => {
+        // This function creates a "fake" behaviorSubject
+        function getObs(name, v) {
+            const subject$ = {
+                v,
+                subscribers: [],
+                next(v) {
+                    if (typeof v !== 'string') {
+                        throw new Exception("Can only send strings through the seleniumContext!")
+                    }
+                    if (v !== v) {
+                        this.v = v;
+                        this.subscribers.forEach(f => f(v));
+                    }
+
+                },
+                subscribe(cb) {
+                    this.subscribers.push(cb);
+                }
+            };
+            subject$.subscribe(v =>
+                window.sendMessageToSelenium(
+                    name,
+                    JSON.stringify(
+                        {
+                            story: v
+                        }
+                    )))
+        }
+
+        // getObs uses this function to send messages to the observables on the other side
+        body.sendMessageToSelenium = function (sender, msg) {
+            const el = document.createElement('div');
+            el.id = `selenium-event-a${counter}`;
+            counter++;
+            el.className = 'selenium-event';
+            el.style = 'top: -1000';
+            el.textContent = JSON.stringify({sender, message: msg});
+            document.body.appendChild(el);
+        };
+
+
+        let counter = 0;
+        // Set up the seleniumContext
+        window.seleniumContext = {};
+        const seleniumContext = JSON.parse(arguments[0]);
+
+        // Fill up window.seleniumContext
+        Object.entries(seleniumContext)
+            .forEach(([key, initValue]) => window.seleniumContext[key] = getObs(key, initValue));
+
+    };
+
+    await driver.executeScript(
+        setupObservables.toString(),
+        JSON.stringify(seleniumContext)
+    );
+
+
+    // Start scanning for messages from selenium.  Once you get them pass them to our seleniumContext
+    setInterval(async () => {
+        const els = await driver.findElements(webdriver.By.className('selenium-event'));
+        for (let i = 0; i < els.length; i++) {
+            const el = els[i];
+            let msg = await el.getText();
+            let id = await el.getAttribute('id');
+            removeElement(driver, id);
+            const {sender, message} = JSON.parse(msg);
+            seleniumContext[sender].next(message);
+        }
+    }, 500);
+
+    // Whenever we update one of our keys in node, update the same one in the browser
+    Object.keys(seleniumContext).forEach(k => {
+        seleniumContext[k].subscribe(v => {
+            driver.executeScript(
+                `
+                const [k, v] = JSON.parse(arguments[0]);
+                // prevent an infinite loop here
+                if (window.seleniumContext[k].v !== v) {
+                    window.seleniumContext[k].next(v);
+                }
+                `, JSON.stringify([k, v])
+            );
+        })
+    });
+
+    return cb
+}
+
+async function passMessageFromSelenium(driver, type, message) {
+    const f = () => {
+        const {type, message} = arguments[0];
+        let s = `$${type}`;
+        if (!seleniumContext[s]) {
+            window.prompt(`Unknown context key ${s}`);
+        }
+        window.seleniumContext[s].next(message);
+    }
+}
+
+async function createSharedContext(driver) {
+    const f = () => {
+
+        window.seleniumContext = {};
+
+        function addProp(k, initValue) {
+            window.seleniumContext[k] = {
+                value: initValue,
+                listeners: []
+            }
+        }
+
+        window.updateContextValue = function (k, v) {
+            const old = window.seleniumContext[k].value;
+            window.seleniumContext[k].value = v;
+            window.seleniumContext[k].listeners.forEach(l => l(old, v));
+
+        };
+        window.getContextValue = function (k) {
+            return window.seleniumContext[k].value
+        };
+    };
+
+}
+
+function parseStory(story) {
+    return story.split('\n').map(parseStory);
+}
+
+async function insertActionIntoStory(action, story) {
+    return story + '\n' + action;
+}
+
+async function insertDefinitionIntoStory(definition, story) {
+    const els = story.split('\n');
+    const firstAction = els.findIndex(({type}) => type === 'action');
+    return els.slice(0, firstAction).concat(definition).concat(els.slice(firstAction)) // TODO I don't know if this will work
+}
+
+function loadStoryFromDisk() {
+    return fs.existsSync('./story.txt') ? fs.readFileSync('./story.txt') : '';
+}
+
 module.exports = {
     loadBundle,
     loadCss,
@@ -313,7 +561,13 @@ module.exports = {
     getStoryObject,
     updateStoryObjectInBrowser,
     setStoryDisplayText,
-    createStoryDisplay
+    createStoryDisplay: createSentenceListAndInputBox,
+    setup,
+    debugToast,
+    updateStory,
+    SeleniumContext,
+    DriverObs,
+    loadStoryFromDisk
 
 };
 
