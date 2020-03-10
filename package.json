@@ -2,16 +2,17 @@
   "name": "my-awesome-package",
   "version": "1.0.0",
   "scripts": {
-    "build": "nearleyc parser/grammer.ne -o parser/grammar.js && rollup node_modules/unique-selector/src/index.js --file bundle.js --format iife\n",
+    "build": "nearleyc parser/grammer.ne -o parser/grammar.js && rollup node_modules/unique-selector/src/index.js --file bundle.js --format iife\n"
   },
   "dependencies": {
-    "chromedriver": "^80.0.0",
+    "chromedriver": "^80.0.1",
     "http-server": "^0.12.1",
+    "jest": "^25.1.0",
     "jquery": "^3.4.1",
+    "nearley": "latest",
     "selenium-listener": "^1.0.1",
     "selenium-webdriver": "^4.0.0-alpha.5",
-    "unique-selector": "^0.4.1",
-    "nearley": "latest"
+    "unique-selector": "^0.4.1"
   },
   "devDependencies": {
     "rollup": "^1.31.1",
