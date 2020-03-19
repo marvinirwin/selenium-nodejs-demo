@@ -1,4 +1,4 @@
-
+const {DriverObs} = require("./javascript/data-bus");
 
 const webdriver = require('selenium-webdriver');
 const chrome = require('selenium-webdriver/chrome');
@@ -28,14 +28,14 @@ const nearley = require("nearley");
 const grammar = require("./grammar/grammar.js");
 const _ = require('lodash');
 const loadStoryFromDisk = require("./javascript").loadStoryFromDisk;
-const DriverObs = require("./javascript").DriverObs;
 
 (async () => {
-    /**
-     * @type {WebDriver}
-     */
-    const d = await setup('http://localhost:8081');
-    const reactor = new DriverObs(d, loadStoryFromDisk);
+    const driver = new webdriver.Builder()
+        .forBrowser('chrome')
+        .build();
+    await driver.get('localhost:8080');
+    const reactor = new DriverObs(driver);
+    await reactor.setup();
     // At this point our entire setup script should be called for this page
     // await execute(d, parsed);
     // await sleep(1);

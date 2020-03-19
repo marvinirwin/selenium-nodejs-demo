@@ -7,6 +7,7 @@ const grammar = require('../grammar/grammar');
 const webdriver = require('selenium-webdriver');
 const sleep = n => new Promise(resolve => setTimeout(resolve, n));
 const {Subject, BehaviorSubject} = require('rxjs');
+const {prompt, createSentenceAndInputBox} = require('./ui');
 
 /**
  * Gets the driver to place a script tag containing the css from the file at @param path
@@ -31,15 +32,15 @@ async function loadCss(driver, path) {
  */
 async function loadJavascript(driver) {
     await loadBundle(driver, path.join(__dirname, 'bundle.js'), 'unique');
+    await loadBundle(driver, path.join(__dirname, 'lodash.min.js'));
     await loadBundle(driver, path.join(__dirname, 'jquery.js'));
     await loadBundle(driver, path.join(__dirname, 'jquery.toast.min.js'));
-    await loadBundle(driver, path.join(__dirname, 'lodash.js'));
     await loadCss(driver, path.join(__dirname, 'jquery.toast.min.css'));
     await loadBundle(driver, path.join(__dirname, 'jquery-ui.min.js'));
     await loadCss(driver, path.join(__dirname, 'jquery-ui.min.css'));
     await loadCss(driver, path.join(__dirname, 'jquery-ui.structure.min.css'));
     await loadCss(driver, path.join(__dirname, 'jquery-ui.theme.min.css'));
-    await driver.executeScript(`window.prompt = ${prompt.toString()}`);
+    await driver.executeScript(`window.prompt = ${(prompt.toString())}`);
     // await loadBundle(driver, path.join(__dirname, 'jquery-modal.js')); TODO do we need this?
 }
 
@@ -86,67 +87,6 @@ async function debugToast(driver, msg) {
             $.toast("${msg}")
         `
     );
-}
-
-/**
- * This is how we prompt the user for the names of its selectors
- * @param sel {string}
- */
-function prompt(sel) {
-    const selElement = $(sel)[0];
-    const modalElement = document.createElement('div');
-    const modalNameInput = document.createElement('input');
-    modalNameInput.className = 'name-selector-prompt';
-    modalNameInput.placeholder = sel;
-    modalElement.style = `
-        position: absolute;
-        left: ${modalElement.offsetLeft},
-        top: ${modalElement.offsetTop}
-        `;
-    modalElement.appendChild(modalNameInput);
-    selElement.parentElement.appendChild(modalElement);
-    modalNameInput.focus();
-    // I think our event reactor function can check for our modal className
-    // And send the events itself
-    // Then its gotta delete the parent once its doen
-}
-
-/**
- * Create an instance of the story display
- *
- * @param d {WebDriver}
- */
-function createSentenceListAndInputBox(d) {
-    function f() {
-        const containerEl = document.createElement('div');
-        const textEl = document.createElement('textarea');
-        const storyEl = document.createElement('ol');
-        textEl.onchange = _.debounce(e => {
-            // TODO check that this innerText is the right thing to look for
-            // Also, this should probably be debounced
-            // I could use lodash
-            // Yeah I should load lodash into the browser
-            window.seleniumContext.story$.next(e.target.innerText);
-        }, 1000);
-
-        window.seleniumContext.story$.subscribe(v => {
-
-        });
-        containerEl.appendChild(textEl);
-        containerEl.appendChild(storyEl);
-        storyEl.id = 'user-story-element';
-        storyEl.style.top = '0';
-        storyEl.style.position = 'fixed';
-        // storyEl.style.backgroundColor = 'black';
-        storyEl.style.minHeight = '100px';
-        storyEl.style.minWidth = '100px';
-        document.body.appendChild(storyEl);
-
-
-    }
-
-
-    return d.executeScript(`(${f.toString()})()`);
 }
 
 /**
@@ -253,15 +193,11 @@ async function setup(page, browser = 'chrome') {
     return d;
 }
 
-function parseStory(story) {
-    return story.split('\n').map(parseStory);
-}
-
-async function insertActionIntoStory(action, story) {
+function insertActionIntoStory(action, story) {
     return story + '\n' + action;
 }
 
-async function insertDefinitionIntoStory(definition, story) {
+function insertDefinitionIntoStory(definition, story) {
     const els = story.split('\n');
     const firstAction = els.findIndex(({type}) => type === 'action');
     return els.slice(0, firstAction).concat(definition).concat(els.slice(firstAction)) // TODO I don't know if this will work
@@ -272,23 +208,11 @@ function loadStoryFromDisk() {
 }
 
 module.exports = {
-    loadBundle,
-    loadCss,
     loadJavascript,
-    prompt,
-    executeStoryObject,
-    addActionToStoryObject,
-    addDefinitionToStoryObject,
-    getStoryObject,
-    updateStoryObjectInBrowser,
-    setStoryDisplayText,
-    createStoryDisplay: createSentenceListAndInputBox,
-    setup,
     debugToast,
-    updateStory,
-    SeleniumContext,
-    DriverObs,
-    loadStoryFromDisk
-
+    insertActionIntoStory,
+    insertDefinitionIntoStory,
+    executeSentences,
+    parseSentence
 };
 
