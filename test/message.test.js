@@ -57,14 +57,6 @@ test('Objects are passed through the driver observable ', async () => {
     const obs = new DriverObs(driver);
     await obs.setup();
 
-    driver.executeScript( `
-        window.seleniumContext.story$.next('');
-        window.seleniumContext.uniqueNameMap$.subscribe(v => {
-            window.seleniumContext.unit_test_bh$.next('yeeeet');
-        });
-        window.seleniumContext.unit_test_bh$.next('what');
-        `
-    );
 
     obs.seleniumContext.story$.next('icecream is div.');
 
@@ -188,5 +180,5 @@ it('Replaying actions works', async () => {
     await shiftClick(popupButton);
     await sleep(1000);
     expect(obs.seleniumContext.story$.split('\n').length).toBe(3);
-    console.info()
+    // How do I replay actions again?
 });

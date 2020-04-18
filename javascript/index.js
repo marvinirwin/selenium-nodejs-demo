@@ -1,13 +1,10 @@
 const path = require('path');
 const fs = require('fs');
-const SAVE_FILENAME = './story.json';
-const _ = require('lodash');
 const nearley = require('nearley');
 const grammar = require('../grammar/grammar');
 const webdriver = require('selenium-webdriver');
 const sleep = n => new Promise(resolve => setTimeout(resolve, n));
-const {Subject, BehaviorSubject} = require('rxjs');
-const {prompt, createSentenceAndInputBox} = require('./ui');
+const {prompt} = require('./ui');
 
 /**
  * Gets the driver to place a script tag containing the css from the file at @param path
@@ -42,6 +39,12 @@ async function loadJavascript(driver) {
     await loadCss(driver, path.join(__dirname, 'jquery-ui.theme.min.css'));
     await driver.executeScript(`window.prompt = ${(prompt.toString())}`);
     // await loadBundle(driver, path.join(__dirname, 'jquery-modal.js')); TODO do we need this?
+    await driver.executeScript(() => {
+        let newChild = document.createElement('div');
+        newChild.id = 'root';
+        document.body.appendChild(newChild);
+    })
+    await loadBundle(driver, path.join(__dirname, '../ui/build/test.js'));
 }
 
 /**
@@ -54,12 +57,6 @@ async function loadJavascript(driver) {
  */
 async function loadBundle(driver, path, globalName) {
     const text = fs.readFileSync(path).toString();
-    const f = () => {
-        const scriptTag = document.createElement('script');
-        scriptTag.innerText = arguments[0];
-        document.body.appendChild(scriptTag);
-    };
-
     let args;
     if (globalName) {
         args = `${globalName} = ${text}`;
@@ -84,15 +81,16 @@ async function loadBundle(driver, path, globalName) {
 async function debugToast(driver, msg) {
     await driver.executeScript(
         `
-            $.toast("${msg}")
-        `
+            $.toast(arguments[0]);
+        `,
+        [msg]
     );
 }
 
 /**
  * Uses nearly to parse a sentence, returning objects for selenium to execute
  * @param sentence
- * @return {{[p: string]: *}}
+ * @return {any}
  */
 function parseSentence(sentence) {
     const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
@@ -102,7 +100,7 @@ function parseSentence(sentence) {
         console.info(sentence)
     }
     if (!value[0]) {
-        console.log();
+        console.log(sentence);
     }
     const t = value[0][0];
     Object.keys(t).forEach(k => {
@@ -128,6 +126,7 @@ async function executeSentences(driver, sentences) {
         let scopeElement;
         for (let i = 0; i < parsedSentences.length; i++) {
             const p = parsedSentences[i];
+            debugToast(driver, `Executing ${JSON.stringify(p)}`);
             switch (p.type) {
                 case "definition":
                     const {varName, selector} = p;
@@ -135,7 +134,7 @@ async function executeSentences(driver, sentences) {
                     scope[varName] = selector;
                     break;
                 case "action":
-                    const {verb, article, noun} = p;
+                    const {verb, noun} = p;
                     debugToast(driver, `${verb} ${noun}`);
                     switch (verb) {
                         case "Click":
@@ -171,26 +170,10 @@ async function executeSentences(driver, sentences) {
             }
         }
     } catch (e) {
-        console.error(e)
+        console.error(e);
         await sleep(10000)
     } finally {
-        driver.close()
     }
-}
-
-/**
- * Performs all necessary setup for a DSL IDE/interpreter
- * @param page
- * @param browser
- * @return {Promise<WebDriver>}
- */
-async function setup(page, browser = 'chrome') {
-    const d = new webdriver.Builder()
-        .forBrowser(browser)
-        .build();
-    await d.get(page);
-
-    return d;
 }
 
 function insertActionIntoStory(action, story) {
@@ -200,13 +183,8 @@ function insertActionIntoStory(action, story) {
 function insertDefinitionIntoStory(definition, story) {
     const els = story.split('\n');
     const firstAction = els.findIndex(({type}) => type === 'action');
-    return els.slice(0, firstAction).concat(definition).concat(els.slice(firstAction)) // TODO I don't know if this will work
+    return els.slice(0, firstAction).concat(definition).concat(els.slice(firstAction)).join('\n') // TODO I don't know if this will work
 }
-
-function loadStoryFromDisk() {
-    return fs.existsSync('./story.txt') ? fs.readFileSync('./story.txt') : '';
-}
-
 module.exports = {
     loadJavascript,
     debugToast,

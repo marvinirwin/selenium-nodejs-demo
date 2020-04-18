@@ -10,6 +10,8 @@ const {insertActionIntoStory} = require("./index");
 const {loadJavascript} = require("./index");
 const input = require('selenium-webdriver/lib/input');
 const {createSentenceListAndInputBox} = require('./ui');
+const command = require('selenium-webdriver/lib/command');
+
 
 const sleep = n => new Promise(resolve => setTimeout(resolve, n));
 
@@ -33,7 +35,7 @@ class SeleniumContext {
                 .filter(v => v)
                 .map(parseSentence)
                 .filter(({type}) => type === 'definition')
-                .forEach(({varName, selector}) => uniqueMap[varName] = selector);
+                .forEach(({varName, selector}) => uniqueMap[selector] = varName);
             let value = JSON.stringify(uniqueMap);
             this.uniqueNameMap$.next(value);
         });
@@ -45,7 +47,23 @@ class SeleniumContext {
 }
 
 class DriverObs {
+    /**
+     *
+     * @param d {WebDriver}
+     * @param story
+     */
     constructor(d, story) {
+        let f = d.executeScript;
+        d.executeScript = function(script, ...args) {
+            if (typeof script === 'function') {
+                script = 'return (' + script + ').apply(null, arguments);';
+            }
+            console.log(script);
+            return this.execute(
+                new command.Command(command.Name.EXECUTE_SCRIPT).
+                setParameter('script', script).
+                setParameter('args', args));
+        };
         this.seleniumContext = new SeleniumContext();
         /**
          * @type {WebDriver}
@@ -70,7 +88,7 @@ class DriverObs {
             this.seleniumContext.story$.next(insertDefinitionIntoStory(v, this.seleniumContext.story$.getValue()));
         });
         this.seleniumContext.executeStory$.subscribe(v => {
-            executeSentences(this.driver, this.seleniumContext.story$.getValue());
+            executeSentences(this.driver, this.seleniumContext.story$.getValue().split('\n').filter(v => v.trim()));
         });
         await setupRecorder(this.driver);
     }
@@ -91,7 +109,7 @@ async function setupRecorder(driver) {
             let ek = e;
             switch (e.type) {
                 case "click":
-                    $.toast(`responding to click shift:${e.shiftKey}`);
+                    // $.toast(`responding to click shift:${e.shiftKey}`);
                     if (e.target.className === 'name-selector-prompt') {
                         return [false, null];
                     }
@@ -119,7 +137,7 @@ async function setupRecorder(driver) {
                         null
                     ];
                 case "keydown":
-                    $.toast(`key: ${e.key} alt: ${e.altKey} ctrl: ${e.ctrlKey}`);
+                    // $.toast(`key: ${e.key} alt: ${e.altKey} ctrl: ${e.ctrlKey}`);
                     if (ek.key === 'e' && ek.ctrlKey) {
                         return [true, {
                             type: "EXECUTE_STORY",
@@ -162,16 +180,17 @@ async function setupRecorder(driver) {
                     window.seleniumContext.addDefinition$.next(result.sentence);
                     break;
                 case "ACTION":
-                    $.toast('adding action');
-                    window.seleniumContext.addAction$.next(result);
+                    $.toast('adding action ' + JSON.stringify(result));
+                    // TODO dont hardcode Click (the browser event is called click and the grammar wants Click
+                    window.seleniumContext.addAction$.next(`Click the ${result.subject}.`);
                     break;
                 case "EXECUTE_STORY":
-                    $.toast('executing story')
+                    $.toast('executing story');
                     // Since these things only propagate if they're different then
                     // We have to inc, this is a cheap hack
                     // Should probably use reduce here
                     window.seleniumContext.executeStory$.next(
-                        window.seleniumContext.executeStory$.value + 1
+                        `${window.seleniumContext.executeStory$.value + 1}`
                     );
                     break;
             }
