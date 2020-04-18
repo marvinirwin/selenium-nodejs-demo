@@ -42,8 +42,15 @@ async function loadJavascript(driver) {
     await driver.executeScript(() => {
         let newChild = document.createElement('div');
         newChild.id = 'root';
+        newChild.style = 'position: fixed; top: 0px;';
         document.body.appendChild(newChild);
-    })
+    });
+    let path1 = 'ui/build/static/css';
+    const cssFiles = fs.readdirSync(path1);
+    for (let i = 0; i < cssFiles.length; i++) {
+        const cssFile = cssFiles[i];
+        await loadCss(driver, path.join(path1, cssFile));
+    }
     await loadBundle(driver, path.join(__dirname, '../ui/build/test.js'));
 }
 

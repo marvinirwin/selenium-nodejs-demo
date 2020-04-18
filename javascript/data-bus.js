@@ -54,16 +54,6 @@ class DriverObs {
      */
     constructor(d, story) {
         let f = d.executeScript;
-        d.executeScript = function(script, ...args) {
-            if (typeof script === 'function') {
-                script = 'return (' + script + ').apply(null, arguments);';
-            }
-            console.log(script);
-            return this.execute(
-                new command.Command(command.Name.EXECUTE_SCRIPT).
-                setParameter('script', script).
-                setParameter('args', args));
-        };
         this.seleniumContext = new SeleniumContext();
         /**
          * @type {WebDriver}

@@ -1,0 +1,76 @@
+{
+	"names": {
+		"span": "what",
+		"#details-button": "details button"
+	},
+	"actions": [
+		{
+			"action": "click",
+			"subject": "what"
+		},
+		{
+			"action": "click",
+			"subject": "what"
+		},
+		{
+			"action": "click",
+			"subject": "details button"
+		},
+		{
+			"action": "click",
+			"subject": "details button"
+		},
+		{
+			"action": "click",
+			"subject": "details button"
+		},
+		{
+			"action": "click",
+			"subject": "details button"
+		},
+		{
+			"action": "click",
+			"subject": "details button"
+		},
+		{
+			"action": "click",
+			"subject": "details button"
+		},
+		{
+			"action": "click",
+			"subject": "what"
+		},
+		{
+			"action": "click",
+			"subject": "what"
+		},
+		{
+			"action": "click",
+			"subject": "what"
+		},
+		{
+			"action": "click",
+			"subject": "what"
+		},
+		{
+			"action": "click",
+			"subject": "what"
+		},
+		{
+			"action": "click",
+			"subject": "details button"
+		},
+		{
+			"action": "click",
+			"subject": "details button"
+		},
+		{
+			"action": "click",
+			"subject": "details button"
+		},
+		{
+			"action": "click",
+			"subject": "details button"
+		}
+	]
+}
