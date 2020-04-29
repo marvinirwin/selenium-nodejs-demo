@@ -1,49 +1,62 @@
 import React, {useEffect, useState} from 'react';
-import logo from './logo.svg';
 import './App.css';
-import {BehaviorSubject, Subject} from "rxjs";
+import {BehaviorSubject, combineLatest, Observable, Subject} from "rxjs";
 import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
-
-class SeleniumContext {
-    private story$: BehaviorSubject<string>;
-    private keydown$: Subject<unknown>;
-    private click$: Subject<unknown>;
-    private addAction$: Subject<unknown>;
-    private addDefinition$: Subject<unknown>;
-    private executeStory$: Subject<unknown>;
-    private unit_test_bh$: BehaviorSubject<string>;
-    private uniqueNameMap$: BehaviorSubject<string>;
-    constructor() {
-        this.story$ = new BehaviorSubject('');
-        this.keydown$ = new Subject();
-        this.click$ = new Subject();
-        this.addAction$ = new Subject();
-        this.addDefinition$ = new Subject();
-        this.executeStory$ = new Subject();
-        this.unit_test_bh$ = new BehaviorSubject('');
-        this.uniqueNameMap$ = new BehaviorSubject('{}');
-    }
-}
-
+// @ts-ignore
+import unique from 'unique-selector';
+import {map, withLatestFrom} from "rxjs/operators";
+import nearley from 'nearley';
+import * as grammar from './grammar/grammar';
+import {useObservable} from "./useObservable";
+import {StoryManager} from "./StoryManager";
+import RealApp from "./RealApp";
 
 function App() {
-  const [actionList, setActionList] = useState([]);
     /**
      * @class {SeleniumContext}
      */
-    // @ts-ignore
-  const ctx = window.seleniumContext;
-  useEffect(() => {
-      ctx.sentences$.subscribe(s => {
-          setActionList(s);
-      });
-  }, []);
-  return <div>
-      <List dense={true}>
-          {actionList.map(a => <ListItem key={a}>a</ListItem>)}
-      </List>
-  </div>
+        // @ts-ignore
+    const [ctx, setCtx] = useState(window.seleniumContext);
+    const [manager, setManager] = useState()
+    setInterval(() => {
+        // @ts-ignore
+        if (window.seleniumContext) {
+            // @ts-ignore
+            setCtx(window.seleniumContext);
+        }
+    }, 250);
+    useEffect(() => {
+        setManager(new StoryManager())
+    }, [])
+
+    return manager ? <RealApp storyManager={manager}/> : <h1>
+        Waiting for SeleniumContext to appear
+    </h1>
 }
+
+
+
+async function initClientSide() {
+    /**
+     * @type {SeleniumContext}
+     */
+        // We only need the server for replaying
+    let ctx = await new Promise(resolve => {
+            let i;
+            i = setInterval(() => {
+                // @ts-ignore
+                ctx = window.seleniumContext;
+                if (ctx) {
+                    resolve(ctx);
+                }
+            }, 250);
+        });
+    const m = new StoryManager();
+}
+
+
+
+
 
 export default App;

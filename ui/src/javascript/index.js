@@ -51,7 +51,7 @@ async function loadJavascript(driver) {
         const cssFile = cssFiles[i];
         await loadCss(driver, path.join(path1, cssFile));
     }
-    await loadBundle(driver, path.join(__dirname, '../ui/build/test.js'));
+    await loadBundle(driver, path.join(__dirname, '../../build/test.js'));
 }
 
 /**
@@ -192,6 +192,7 @@ function insertDefinitionIntoStory(definition, story) {
     const firstAction = els.findIndex(({type}) => type === 'action');
     return els.slice(0, firstAction).concat(definition).concat(els.slice(firstAction)).join('\n') // TODO I don't know if this will work
 }
+
 module.exports = {
     loadJavascript,
     debugToast,
